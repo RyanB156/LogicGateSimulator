@@ -16,11 +16,11 @@ click to toggle the inputs for the circuit and see the output.
 <source gate name>[.<output number> (0 indexed)] :- <target gate name>[, <target gate input choice> (1 indexed)]  
 create <gateName>(In1Name, ..., InNName : Out1Name, ..., OutNName)  
 {  
-    Out1Name <- (Boolean expression using [', ., +, =>, ==, <>]) ; [// <comment>]  
-    ..., OutNName <- ... ;  
+    Out1Name <- (Boolean expression using [', ., +, =>, ==, <>]) ; [// comment]  
+    ..., OutNName "<-" ... ;  
 }  
-[// <comment>]  
-[/* <block comment> */]  
+[// comment]  
+[/* block comment */]  
   
 ----Sample Program----  
 // Negation circuit.  
