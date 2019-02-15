@@ -39,6 +39,7 @@ Output Output1
 
 Input1 :- myGate, a
 myGate.o :- Output1
+
 ----------------------
 
 ----Sample Program----
@@ -81,4 +82,5 @@ myGate.H :- CarryOr, 4
 
 SumOr :- Sum
 CarryOr :- Carry
+
 ----------------------
