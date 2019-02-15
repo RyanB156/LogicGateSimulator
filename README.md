@@ -17,7 +17,7 @@ click to toggle the inputs for the circuit and see the output.
 create <gateName>(In1Name, ..., InNName : Out1Name, ..., OutNName)  
 {  
     Out1Name <- (Boolean expression using [', ., +, =>, ==, <>]) ; [// comment]  
-    ..., OutNName "<-" ... ;  
+    ..., OutNName <- ... ;  
 }  
 [// comment]  
 [/* block comment */]  
