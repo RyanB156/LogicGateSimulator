@@ -1,0 +1,8 @@
+﻿Input Input1
+Input Input2
+Xor2 Xor1(A, B)
+Output Output1
+
+Input1 :- Xor1, A
+Input2 :- Xor1, B
+Xor1 :- Output1
