@@ -147,6 +147,7 @@ module Parser =
 
     let getCircuit statements =
         let circuit = new List<LogicGate>()
+        let mutable typeList = new ResizeArray<GateType>()
 
         areDuplicatedNames statements // Check if there are any duplicates. If so, throw an exception.
 
@@ -188,23 +189,42 @@ module Parser =
                 | Gate.TFlipFlop -> circuit.Add(new TFlipFlop(name, outputList))
                 | _ -> failwithf "%A is not an UnaryGate" typeName
 
+            | Instantiate (gateType, gateName) ->
+                try
+
+                    let typeFinder = new Predicate<GateType>(function | Custom (typeName, _, _, _) -> true | _ -> false)
+
+                    let t = typeList.Find typeFinder
+
+                    match t with
+                    | Custom (typeName, inputNames, outputNames, outputFunctions) ->
+
+                        let inNamesLength = inputNames.Length
+                        let outNamesLength = outputNames.Length
+                        if inNamesLength = 0 || outputNames.Length = 0 then failwith "Custom gate %s must define input and output names" else
+                        if outNamesLength <> outputFunctions.Length 
+                            then failwithf "The number of output functions does not match the number of inputs for custom gate %s" typeName
+                        else
+                            let truthTable = getTruthTable inputNames outputNames outputFunctions
+                            truthTable |> Array.iter (fun (name, dict) -> printfn "%s %A" name dict)
+
+                            // Temporary for debugging purposes. Make the original function do this from the beginning...
+                            let truthTable = truthTable |> Array.map (fun (_,dict) -> dict)
+
+                            let inputs = inputNames |> ResizeArray<string>
+                            let outputs = outputNames |> ResizeArray<string>
+
+                            circuit.Add(new CustomGate(gateName, inNamesLength, outNamesLength, inputs, outputs, truthTable))
+                    | _ -> failwithf "You cannot instantiate non-Custom gates"
+
+                with
+                | :? ArgumentNullException -> failwithf "A custom gate of type %s could not be found" gateType
+
             | Define (Custom (name, inputNames, outputNames, outputFunctions)) ->
-                let inNamesLength = inputNames.Length
-                let outNamesLength = outputNames.Length
-                if inNamesLength = 0 || outputNames.Length = 0 then failwith "Custom gate %s must define input and output names" else
-                if outNamesLength <> outputFunctions.Length 
-                    then failwithf "The number of output functions does not match the number of inputs for custom gate %s" name
-                else
-                    let truthTable = getTruthTable inputNames outputNames outputFunctions
-                    truthTable |> Array.iter (fun (name, dict) -> printfn "%s %A" name dict)
 
-                    // Temporary for debugging purposes. Make the original function do this from the beginning...
-                    let truthTable = truthTable |> Array.map (fun (_,dict) -> dict)
+                typeList.Add(Custom (name, inputNames, outputNames, outputFunctions))
 
-                    let inputs = inputNames |> ResizeArray<string>
-                    let outputs = outputNames |> ResizeArray<string>
-
-                    circuit.Add(new CustomGate(name, inNamesLength, outNamesLength, inputs, outputs, truthTable))
+                
             (*
             MyDecoder.H :- SumOr, 4
             MyDecoder.H :- SumOr, 4; CarryOr, 4

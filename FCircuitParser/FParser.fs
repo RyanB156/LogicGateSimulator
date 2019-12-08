@@ -85,6 +85,7 @@ module FParser =
         type Statement = 
             | Comment
             | Define of GateType
+            | Instantiate of Identifier * Identifier // MyGate (gate1)
             | Connect of Identifier * Identifier * OutputType
             | ConnectList of Identifier * NodeChoice option * (Identifier * NodeChoice) list
             // | Connect of Identifier * NodeChoice option * (Identifier * NodeChoice) list
@@ -258,6 +259,9 @@ module FParser =
             | None, (Some outputs) -> [], outputs
             | (Some inputs), (Some outputs) -> inputs, outputs
 
+    let pInstantiate = pipe2 (identifier) (between (pchar '(') (pchar ')') (identifier))
+                        (fun typeName gateName -> Instantiate (typeName, gateName))
+
     // Multiple inputs.
     let pDefNaryGate = pipe4 (nAryGateMatch) (pint32 .>> ws1) (identifier) (opt pDeclaredNames)
                             (fun gate inputCount name declareNamesOpts -> 
@@ -320,7 +324,7 @@ module FParser =
 
     // >>. chains the parsers together like normal while .>> causes the next parser to consume input, but doesn't use the input.
 
-    let statement = (attempt connect <|> defineGate <|> pComment) .>> wsBeforeEOL
+    let statement = (attempt connect <|> attempt pInstantiate <|> defineGate <|> pComment) .>> wsBeforeEOL
 
     indentedStatementsRef := indentedMany1 statement "statement"
 

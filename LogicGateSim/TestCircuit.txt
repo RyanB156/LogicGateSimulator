@@ -15,20 +15,23 @@ define MyOr(a, b, c, d : out)
     out <- a + b + c + d;
 }
 
+MyOr(sumOr)
+MyOr(carryOr)
+
 Input1 :- decoder, 1 // Reference inputs to the next gate with <next gate name>, <input name (or number if using the default gates)>
 Input2 :- decoder, 2
 Input3 :- decoder, 3
 
-decoder.1 :- MyOr, a // Gate outputs are 0 indexed, so decoder.1 refers to the second output (minterm 001)
-decoder.2 :- MyOr, b
-decoder.4 :- MyOr, c
+decoder.1 :- sumOr, a // Gate outputs are 0 indexed, so decoder.1 refers to the second output (minterm 001)
+decoder.2 :- sumOr, b
+decoder.4 :- sumOr, c
 
-decoder.3 :- CarryOr, 1
-decoder.5 :- CarryOr, 2
-decoder.6 :- CarryOr, 3
+decoder.3 :- carryOr, 1
+decoder.5 :- carryOr, 2
+decoder.6 :- carryOr, 3
 
-decoder.7 :- MyOr, d; CarryOr, 4
+decoder.7 :- sumOr, d; carryOr, 4
 
-MyOr.out :- Sum
-CarryOr :- Carry
+sumOr.out :- Sum
+carryOr.out :- Carry
 
