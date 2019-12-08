@@ -20,6 +20,7 @@ using static FCircuitParser.FParser.CircuitTypes;
  * Added support for named inputs for all gates for use in the interpreter stage. 7 December 2018.
  * Added named outputs for some gates. 11 December 2018.
  * Added custom logic gates that can be defined using logical expressions. 11 December 2018.
+ * Simplified code for computing the output NaryGates. Replaced for loop with list reduce. 7 December 2019.
  */
 
 /* Todo:
@@ -58,7 +59,7 @@ namespace LogicGateSim
             {
                 inConsole = true;
                 path = args[0];
-                Int32.TryParse(args[1], out testCount);
+                int.TryParse(args[1], out testCount);
             }
             else
             {
@@ -128,9 +129,7 @@ namespace LogicGateSim
                     for (int j = 0; j < inputGates.Count; j++)
                     {
                         // Set input to the InputGates based on the test cases and fire all of the inputs.
-                        List<bool> bools = testCases[i];
-                        inputGates[j].SetInput(bools[j]);
-
+                        inputGates[j].SetInput(testCases[i][j]);
                         inputGates[j].Fire();
                     }
 

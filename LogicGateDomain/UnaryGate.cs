@@ -142,6 +142,23 @@ namespace LogicGateDomain
             output = input;
             SendOutput();
         }
+    }
 
+    // Clock will be paired with a timer to generate the clock signal.
+    // Needs to output false, unless the timer ticks, then it will output true.
+    // Relearn how the input gates work because the timer may have to activate Clock gates in a similar manner.
+    public class Clock : UnaryGate
+    {
+        public Clock(string name, int interval) : base(name)
+        {
+
+        }
+
+        public override void CheckOutput()
+        {
+            throw new NotImplementedException();
+        }
+
+        
     }
 }

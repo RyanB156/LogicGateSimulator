@@ -14,6 +14,8 @@ namespace LogicGateSim
         List<FormOutput> outputFields; // Container for storing all of the output labels and display logic.
         List<IClockable> clockables; // Container for storing all gates that take a clock input.
 
+        List<Clock> clocks; // Container for storing clocks in the future...
+
         Timer timer;
 
         public event EventHandler DisplayClosed;
@@ -50,6 +52,8 @@ namespace LogicGateSim
             inputFields = new List<FormInput>();
             outputFields = new List<FormOutput>();
             clockables = new List<IClockable>();
+
+            clocks = new List<Clock>();
 
             // Iterate through the gates in circuit and create the controls for the input and output gates.
             foreach (var gate in logicCircuit)

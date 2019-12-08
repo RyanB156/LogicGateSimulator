@@ -7,8 +7,9 @@ module FParser =
     <source gate name>[.<output number> (0 indexed)] :- <target gate name>[, <target gate input choice> (1 indexed)]
     create <gateName>(In1Name, ..., InNName : Out1Name, ..., OutNName)
     {
-        Out1Name <- (Boolean expression using [', ., +, =>, ==, <>]) ; [// <comment>]
-        ..., OutNName <- ... ;
+        Out1Name <- (Boolean expression using [', ., +, =>, ==, <>], 1, 0) ; [// <comment>]
+        ...; 
+        OutNName <- ... ;
     }
     [// <comment>]
     [/* <block comment> */]
@@ -78,13 +79,25 @@ module FParser =
             | Custom of Identifier * Inputs * Outputs * OutputFunction list
 
         type OutputType =
-            | OneOut of NodeChoice
-            | ManyOut of NodeChoice * NodeChoice // Connect to Input node from Output node.
+            | OneOut of NodeChoice // source.Output
+            | ManyOut of NodeChoice * NodeChoice // target.Input * source.Output
 
         type Statement = 
             | Comment
             | Define of GateType
             | Connect of Identifier * Identifier * OutputType
+            | ConnectList of Identifier * NodeChoice option * (Identifier * NodeChoice) list
+            // | Connect of Identifier * NodeChoice option * (Identifier * NodeChoice) list
+            //              sourceName     source.Output   (targetName   target.Input) list
+        (*
+        MyDecoder.H :- SumOr, 4
+        MyDecoder.H :- SumOr, 4; CarryOr, 4
+
+        ConnectList of sourceName * source.Output * (targetName * target.Input) list
+
+        Trying to allow a gate's output to be connected to the input on many other gates with one statement
+        sourceGate[.outputName] :- targetGate, targetInput list
+        *)
 
     module IndentationParserWithoutBacktracking =
 
@@ -262,7 +275,7 @@ module FParser =
 
     let pBlock = (many1 (wsopt >>. pAssign .>> str_ws ";" .>> wsBeforeEOL)) |> between (str_ws "{") (pstring "}") <!> "Parse Block"
 
-    let pDefCustomGate = pipe3 (pstring "create" >>. ws1 >>. identifier) (pInputAndOutputNames) (pBlock)
+    let pDefCustomGate = pipe3 (pstring "define" >>. ws1 >>. identifier) (pInputAndOutputNames) (pBlock)
                             (fun name (inputNames, outputNames) exprs -> Define (Custom (name, inputNames, outputNames, exprs)) )
                             <!> "Define Custom Gate"
 
@@ -274,21 +287,34 @@ module FParser =
 
     let pInputNodeType = attempt (ws1 >>. pint32 .>> wsBeforeEOL |>> NodeNumber) <|> (ws1 >>. identifier .>> wsBeforeEOL |>> NodeName)
 
-    let pConToNaryGate = pipe4 (pOutputType) (ws1 >>. pstring ":-") (ws1 >>. identifier) (skipChar ',' >>. pInputNodeType)
+    // Parses the target gate name plus an optional input node for the target gate. 
+    // Unary gates will be <unaryName,None> while Nary gates will be <naryName,Some inputChoice>.
+    let pTargetConnection = 
+        pipe2 (opt ws1 >>. identifier) (opt (skipChar ',' >>. pInputNodeType)) (fun name outChoice -> (name, outChoice))
+        <!> "pTargetConnection"
+        
+    let pConnector = ws1 >>. pstring ":-" <!> "pConnector"
+
+    let pConToNaryGate = pipe4 (pOutputType) (pConnector) (ws1 >>. identifier) (skipChar ',' >>. pInputNodeType)
                             (fun (name,outChoice) _ target targetNode -> 
                                 match outChoice with
                                 | None -> Connect (name, target, (OneOut targetNode))
                                 | Some n -> Connect (name, target, (ManyOut (targetNode, n)))
                             ) //<!> "Connect To Nary Gate"
 
-    let pConToUnaryGate = pipe3 (pOutputType) (ws1 >>. pstring ":-") (ws1 >>. identifier)
+    let pConToUnaryGate = pipe3 (pOutputType) (pConnector) (ws1 >>. identifier)
                             (fun (name,outChoice) _ target -> 
                                 match outChoice with
                                 | None -> Connect (name, target, (OneOut (NodeNumber 1)) ) // 1 is the default value for unary gates.
                                 | Some n -> Connect (name, target, (ManyOut (NodeNumber 1, n)))
                             ) //<!> "Connect To Unary Gate"
+
+    let connectList = pipe3 (pOutputType) (pConnector) (sepBy pTargetConnection (pchar ';' .>> opt ws1))
+                        (fun (name, outOpt) _ connections -> 
+                            let connections = connections |> List.map (function | (n, None) -> (n, NodeNumber 1) | (n, Some c) -> (n, c))
+                            ConnectList(name, outOpt, connections))
     
-    let connect = (attempt pConToNaryGate <|> pConToUnaryGate) .>> wsBeforeEOL
+    let connect = connectList <!> "connect" //(attempt pConToNaryGate <|> pConToUnaryGate) .>> wsBeforeEOL
 
     let pComment = comment |>> (fun _ -> Comment) <!> "PComment"
 
@@ -310,3 +336,23 @@ module FParser =
     let getProgram str = 
         //printfn "%A" str
         runParserOnString document (UserState.Create()) "" str
+
+
+(*
+    I want to change the syntax for defining a custom gate to have the assignment statements be in an indented block without a trailing semicolon
+    There is an issue with the "wsBeforeEOL" parser that makes it consume beyond the '\n' at the end of the line. It skips this and consumes the
+    '\t' at the beginning of the assignment statement. This makes it where I cannot define blocks using "indentedMany1 block" because indentendMany1
+    does not have any whitespace to count.
+
+    I have tried changing the "wsBeforeEOL" parser but this breaks other parts for some reason. I need to find the source of the issues but I do not
+    feel well enough to do that right now :(
+
+
+    Future Plans:
+        Make clocks where they have to be defined and connected explicitly in the program. These will be found by the C# system to create timers for
+            these and start them
+        Allow modules to be created in separate files and loaded in
+        Define custom gate types then instantiate them. Right now, defining a custom gate only gives one instance of the gate.
+        √ Allow connections to be made by specifying the output node and a list of target nodes
+            E.g. myAdder.sum :- out1; decoder2, 1
+*)

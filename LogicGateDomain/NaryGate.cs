@@ -55,7 +55,7 @@ namespace LogicGateDomain
             }
         }
 
-        // Update either input gates with a true or false value.
+        // Update either inputs with a true or false value.
         public override void Activate(int inputSide, bool input)
         {
             // N input behavior
@@ -68,7 +68,6 @@ namespace LogicGateDomain
                 CheckOutput();
             }
         }
-
     }
 
     public class AndGate : NaryGate
@@ -76,13 +75,7 @@ namespace LogicGateDomain
         public AndGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            bool temp = inputStates[0];
-            for (int i = 1; i < inputStates.Length; i++)
-            {
-                temp = temp && inputStates[i];
-            }
-            output = temp;
-            //output = AInput && BInput;
+            output = inputStates.Aggregate((a, b) => a && b);   
             SendOutput();
         }
     }
@@ -92,13 +85,7 @@ namespace LogicGateDomain
         public OrGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            bool temp = inputStates[0];
-            for (int i = 1; i < inputStates.Length; i++)
-            {
-                temp = temp || inputStates[i];
-            }
-            output = temp;
-            //output = AInput || BInput;
+            output = inputStates.Aggregate((a, b) => a || b);
             SendOutput();
         }
     }
@@ -110,13 +97,8 @@ namespace LogicGateDomain
 
         public override void CheckOutput()
         {
-            bool temp = inputStates[0];
-            for (int i = 1; i < inputStates.Length; i++)
-            {
-                temp = temp ^ inputStates[i];
-            }
-            output = temp;
-            //output = AInput ^ BInput;
+            output = inputStates.Aggregate((a, b) => a ^ b);
+            // output = AInput ^ BInput;
             SendOutput();
         }
     }
@@ -127,12 +109,7 @@ namespace LogicGateDomain
         public XnorGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            bool temp = inputStates[0];
-            for (int i = 1; i < inputStates.Length; i++)
-            {
-                temp = temp ^ inputStates[i];
-            }
-            output = !temp;
+            output = !inputStates.Aggregate((a, b) => a ^ b);
             //output = AInput == BInput;
             SendOutput();
         }
@@ -143,12 +120,7 @@ namespace LogicGateDomain
         public NandGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            bool temp = inputStates[0];
-            for (int i = 1; i < inputStates.Length; i++)
-            {
-                temp = temp && inputStates[i];
-            }
-            output = !temp;
+            output = !inputStates.Aggregate((a, b) => a && b);
             //output = !(AInput && BInput);
             SendOutput();
         }
@@ -159,12 +131,7 @@ namespace LogicGateDomain
         public NorGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            bool temp = inputStates[0];
-            for (int i = 1; i < inputStates.Length; i++)
-            {
-                temp = temp || inputStates[i];
-            }
-            output = temp;
+            output = !inputStates.Aggregate((a, b) => a || b);
             //output = !(AInput || BInput);
             SendOutput();
         }

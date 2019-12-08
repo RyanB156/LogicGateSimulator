@@ -42,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CustomGate.cs" />
     <Compile Include="LogicGate.cs" />
     <Compile Include="MSIGates.cs" />
     <Compile Include="NaryGate.cs" />
