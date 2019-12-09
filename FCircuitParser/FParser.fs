@@ -56,6 +56,7 @@ module FParser =
         //
 
         type Identifier = string
+        type FileName = string
         type InputNode = int
         type OutputNode = int
         type InputCount = int
@@ -84,6 +85,7 @@ module FParser =
 
         type Statement = 
             | Comment
+            | Load of FileName
             | Define of GateType
             | Instantiate of Identifier * Identifier // MyGate (gate1)
             | Connect of Identifier * Identifier * OutputType
@@ -322,9 +324,11 @@ module FParser =
 
     let pComment = comment |>> (fun _ -> Comment) <!> "PComment"
 
+    let pLoad = pstring "load" >>. ws1 >>. between (pchar '\"') (pchar '\"') (manySatisfy (fun x -> x <> '\"')) .>> wsBeforeEOL |>> Load
+
     // >>. chains the parsers together like normal while .>> causes the next parser to consume input, but doesn't use the input.
 
-    let statement = (attempt connect <|> attempt pInstantiate <|> defineGate <|> pComment) .>> wsBeforeEOL
+    let statement = (pLoad <|> attempt connect <|> attempt pInstantiate <|> defineGate <|> pComment) .>> wsBeforeEOL
 
     indentedStatementsRef := indentedMany1 statement "statement"
 
@@ -355,8 +359,10 @@ module FParser =
     Future Plans:
         Make clocks where they have to be defined and connected explicitly in the program. These will be found by the C# system to create timers for
             these and start them
-        Allow modules to be created in separate files and loaded in
+        √ Allow modules to be created in separate files and loaded in
         Define custom gate types then instantiate them. Right now, defining a custom gate only gives one instance of the gate.
         √ Allow connections to be made by specifying the output node and a list of target nodes
             E.g. myAdder.sum :- out1; decoder2, 1
+
+        Write documentation for all gate types
 *)

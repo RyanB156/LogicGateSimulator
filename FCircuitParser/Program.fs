@@ -144,204 +144,6 @@ module Parser =
                 | Some (_, func) -> name, func)
         |> List.toArray
 
-
-    let getCircuit statements =
-        let circuit = new List<LogicGate>()
-        let mutable typeList = new ResizeArray<GateType>()
-
-        areDuplicatedNames statements // Check if there are any duplicates. If so, throw an exception.
-
-        statements |> Seq.iter (printfn "%A"); printfn "";
-
-        for cmd in statements do
-            printfn "Checking: %A" cmd
-            match cmd with
-            | Comment -> ()
-            | Define (NaryGate (typeName, name, inputCount, inputNames, outputNames)) -> 
-                let namesCount = inputNames.Length
-                if namesCount > inputCount && typeName <> Gate.Multiplexer then failwithf "Gate %s has too many named inputs" name else
-                let inputList = inputNames |> ResizeArray<string> // Might be [] or [n1, ...]
-                let outputList = outputNames |> ResizeArray<string> // Might be [] or [n1, ...]
-
-                match typeName with
-                | Gate.And -> circuit.Add(new AndGate(name, inputCount, inputList))
-                | Gate.Or -> circuit.Add(new OrGate(name, inputCount, inputList))
-                | Gate.Xor -> circuit.Add(new XorGate(name, inputCount, inputList))                            
-                | Gate.Xnor -> circuit.Add(new XnorGate(name, inputCount, inputList))
-                | Gate.Nand -> circuit.Add(new NandGate(name, inputCount, inputList))
-                | Gate.Nor -> circuit.Add(new NorGate(name, inputCount, inputList))
-                | Gate.Decoder -> circuit.Add(new NDecoder(name, inputCount, inputList, outputList))
-                | Gate.Multiplexer -> circuit.Add(new Multiplexer(name, inputCount, inputList))
-                | Gate.JKFlipFlop -> circuit.Add(new JKFlipFlop(name, 2, inputList, outputList))
-                | _ -> failwithf "%A is not an NaryGate" typeName
-
-            | Define (UnaryGate (typeName, name, outputNames)) ->
-                let outputList = outputNames |> ResizeArray<string> // Might be [] or [n1, ...]
-
-                match typeName with
-                | Gate.Output -> circuit.Add(new OutputGate(name))
-                | Gate.Not -> circuit.Add(new NotGate(name))
-                | Gate.Identity -> circuit.Add(new IdentityGate(name))
-                | Gate.True -> circuit.Add(new TrueGate(name))
-                | Gate.False -> circuit.Add(new FalseGate(name))
-                | Gate.Input -> circuit.Add(new InputGate(name, false))
-                | Gate.DFlipFlop -> circuit.Add(new DFlipFlop(name, outputList))
-                | Gate.TFlipFlop -> circuit.Add(new TFlipFlop(name, outputList))
-                | _ -> failwithf "%A is not an UnaryGate" typeName
-
-            | Instantiate (gateType, gateName) ->
-                try
-
-                    let typeFinder = new Predicate<GateType>(function | Custom (typeName, _, _, _) -> true | _ -> false)
-
-                    let t = typeList.Find typeFinder
-
-                    match t with
-                    | Custom (typeName, inputNames, outputNames, outputFunctions) ->
-
-                        let inNamesLength = inputNames.Length
-                        let outNamesLength = outputNames.Length
-                        if inNamesLength = 0 || outputNames.Length = 0 then failwith "Custom gate %s must define input and output names" else
-                        if outNamesLength <> outputFunctions.Length 
-                            then failwithf "The number of output functions does not match the number of inputs for custom gate %s" typeName
-                        else
-                            let truthTable = getTruthTable inputNames outputNames outputFunctions
-                            truthTable |> Array.iter (fun (name, dict) -> printfn "%s %A" name dict)
-
-                            // Temporary for debugging purposes. Make the original function do this from the beginning...
-                            let truthTable = truthTable |> Array.map (fun (_,dict) -> dict)
-
-                            let inputs = inputNames |> ResizeArray<string>
-                            let outputs = outputNames |> ResizeArray<string>
-
-                            circuit.Add(new CustomGate(gateName, inNamesLength, outNamesLength, inputs, outputs, truthTable))
-                    | _ -> failwithf "You cannot instantiate non-Custom gates"
-
-                with
-                | :? ArgumentNullException -> failwithf "A custom gate of type %s could not be found" gateType
-
-            | Define (Custom (name, inputNames, outputNames, outputFunctions)) ->
-
-                typeList.Add(Custom (name, inputNames, outputNames, outputFunctions))
-
-                
-            (*
-            MyDecoder.H :- SumOr, 4
-            MyDecoder.H :- SumOr, 4; CarryOr, 4
-
-            ConnectList of sourceName * source.Output * (targetName * target.Input) list
-
-            Trying to allow a gate's output to be connected to the input on many other gates with one statement
-            sourceGate[.outputName] :- targetGate, targetInput list
-            *)
-            | ConnectList (sourceName, sourceOutput, targets) ->
-                printfn "Connecting %A" (sourceName, sourceOutput, targets)
-                // Search the circuit to find gates that are already defined
-                try
-                    let sourceGate = circuit.Find(fun x -> x.Name = sourceName)
-                    if sourceGate = null then failwithf "Source gate '%s' is not defined" sourceName
-
-                    targets |> List.iter (fun (targetName, targetNode) ->
-                    
-                        try
-                            let targetGate = circuit.Find(fun x -> x.Name = targetName)
-                            if targetGate = null then failwithf "Source gate '%s' is not defined" sourceName
-
-                            let intNode = 
-                                match targetNode with
-                                | NodeNumber n -> n
-                                | NodeName stringNode -> 
-                                    let x = targetGate.GetIndexForInputName(stringNode)
-                                    if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringNode else x
-
-                            match sourceOutput with
-                            | None -> // Single output gate. sourceGate should only be and, or, not, etc.
-                                match sourceGate with
-                                    | :? SingleOutputGate as s -> s.AddConnection(new OutputConnection(targetGate, intNode))
-                                    | :? MultipleOutputGate as m -> failwithf "%s must specify an output node choice" m.Name
-                                    | _ -> printfn "Error in Connect, OneOut, NodeChoice for %s" sourceGate.Name
-
-                            | Some (outputChoice) -> // Multiple output gate. sourceGate should only be decoder, custom, etc.
-                                match sourceGate with
-                                | :? SingleOutputGate as s -> failwithf "%s does not have multiple outputs" s.Name
-                                | :? MultipleOutputGate as m -> 
-                                    match outputChoice with // Match on the output node of the source gate second.
-                                    | NodeNumber outputNodeNumber ->
-                                        m.AddConnectionTo(new OutputConnection(targetGate, intNode), outputNodeNumber)
-                                    | NodeName outputNodeName ->
-                                        match m.GetIndexForOutputName(outputNodeName) with
-                                        | x when x = -1 -> failwithf "Gate %s does not have an output with the name %s" m.Name outputNodeName
-                                        | outputNumber -> m.AddConnectionTo(new OutputConnection(targetGate, intNode), outputNumber-1)
-                                | _ -> printfn "Error in Connect, ManyOut, InputNode for %s" sourceGate.Name
-                    
-                        with
-                        | :? ArgumentNullException ->
-                            raise (GateNotDefinedException("Target gate " + targetName + " is not defined"))
-                    )
-                with 
-                | :? ArgumentNullException ->
-                    raise (GateNotDefinedException("Source gate " + sourceName + " is not defined"))
-
-            | Connect (sourceName, targetName, outputType) ->
-                printfn "Connecting %A" (sourceName, targetName, outputType)
-                // Search the circuit to find gates that are already defined
-                try
-                    let sourceGate = circuit.Find(fun x -> x.Name = sourceName)
-                    if sourceGate = null then failwithf "Source gate '%s' is not defined" sourceName
-
-                    try
-                        let targetGate = circuit.Find(fun y -> y.Name = targetName)
-                        if targetGate = null then failwithf "Target gate '%s' is not defined" targetName
-
-                        match outputType with
-                        | OneOut targetNode ->
-
-                            let intNode = 
-                                match targetNode with
-                                | NodeNumber n -> n
-                                | NodeName stringNode -> 
-                                    let x = targetGate.GetIndexForInputName(stringNode)
-                                    if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringNode else x
-                            
-                            match sourceGate with
-                                | :? SingleOutputGate as s -> s.AddConnection(new OutputConnection(targetGate, intNode))
-                                | :? MultipleOutputGate as m -> failwithf "%s must specify an output node choice" m.Name
-                                | _ -> printfn "Error in Connect, OneOut, NodeChoice for %s" sourceGate.Name
-                            
-                        | ManyOut (targetNode, outputNode) ->
-
-                            let intInput = 
-                                match targetNode with // Match on the target node first using integer or name indexing.
-                                | NodeNumber intInput -> intInput 
-                                | NodeName stringInput -> 
-                                    let x = targetGate.GetIndexForInputName(stringInput)
-                                    if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringInput else x
-
-                            match sourceGate with // Then match on the source node using integer or name indexing
-                            | :? SingleOutputGate as s -> failwithf "%s does not have multiple outputs" s.Name
-                            | :? MultipleOutputGate as m -> 
-                                match outputNode with // Match on the output node of the source gate second.
-                                | NodeNumber outputNodeNumber ->
-                                    m.AddConnectionTo(new OutputConnection(targetGate, intInput), outputNodeNumber)
-                                | NodeName outputNodeName ->
-                                    match m.GetIndexForOutputName(outputNodeName) with
-                                    | x when x = -1 -> failwithf "Gate %s does not have an output with the name %s" m.Name outputNodeName
-                                    | outputNumber -> m.AddConnectionTo(new OutputConnection(targetGate, intInput), outputNumber-1)
-                            | _ -> printfn "Error in Connect, ManyOut, InputNode for %s" sourceGate.Name
-
-                                    
-                            // Input node range checking must be done in the constructors...
-                            
-                    with
-                    | :? ArgumentNullException ->
-                        raise (GateNotDefinedException("Target gate " + targetName + " is not defined"))
-                with 
-                | :? ArgumentNullException ->
-                    raise (GateNotDefinedException("Source gate " + sourceName + " is not defined"))
-        printfn "\nEnd of Parsing Stage\n\n"
-        circuit
-                    
-
     let getProgram (path:string) =
         use sr = new StreamReader(path)
         let text = sr.ReadToEnd() + "\n"
@@ -354,6 +156,207 @@ module Parser =
             codeStrList
         
         | Failure (msg,_,_) -> raise (new LogicGateDomain.ParserErrorException(msg))
+
+    let getCircuit statements =
+        let circuit = new List<LogicGate>()
+        let mutable typeList = new ResizeArray<GateType>()
+
+        let rec inner statements = 
+
+            areDuplicatedNames statements // Check if there are any duplicates. If so, throw an exception.
+
+            statements |> Seq.iter (printfn "%A"); printfn "";
+
+            for cmd in statements do
+                printfn "Checking: %A" cmd
+                match cmd with
+                | Comment -> ()
+                | Load filename -> printfn "Loading %s" filename; getProgram filename |> inner
+                | Define (NaryGate (typeName, name, inputCount, inputNames, outputNames)) -> 
+                    let namesCount = inputNames.Length
+                    if namesCount > inputCount && typeName <> Gate.Multiplexer then failwithf "Gate %s has too many named inputs" name else
+                    let inputList = inputNames |> ResizeArray<string> // Might be [] or [n1, ...]
+                    let outputList = outputNames |> ResizeArray<string> // Might be [] or [n1, ...]
+
+                    match typeName with
+                    | Gate.And -> circuit.Add(new AndGate(name, inputCount, inputList))
+                    | Gate.Or -> circuit.Add(new OrGate(name, inputCount, inputList))
+                    | Gate.Xor -> circuit.Add(new XorGate(name, inputCount, inputList))                            
+                    | Gate.Xnor -> circuit.Add(new XnorGate(name, inputCount, inputList))
+                    | Gate.Nand -> circuit.Add(new NandGate(name, inputCount, inputList))
+                    | Gate.Nor -> circuit.Add(new NorGate(name, inputCount, inputList))
+                    | Gate.Decoder -> circuit.Add(new NDecoder(name, inputCount, inputList, outputList))
+                    | Gate.Multiplexer -> circuit.Add(new Multiplexer(name, inputCount, inputList))
+                    | Gate.JKFlipFlop -> circuit.Add(new JKFlipFlop(name, 2, inputList, outputList))
+                    | _ -> failwithf "%A is not an NaryGate" typeName
+
+                | Define (UnaryGate (typeName, name, outputNames)) ->
+                    let outputList = outputNames |> ResizeArray<string> // Might be [] or [n1, ...]
+
+                    match typeName with
+                    | Gate.Output -> circuit.Add(new OutputGate(name))
+                    | Gate.Not -> circuit.Add(new NotGate(name))
+                    | Gate.Identity -> circuit.Add(new IdentityGate(name))
+                    | Gate.True -> circuit.Add(new TrueGate(name))
+                    | Gate.False -> circuit.Add(new FalseGate(name))
+                    | Gate.Input -> circuit.Add(new InputGate(name, false))
+                    | Gate.DFlipFlop -> circuit.Add(new DFlipFlop(name, outputList))
+                    | Gate.TFlipFlop -> circuit.Add(new TFlipFlop(name, outputList))
+                    | _ -> failwithf "%A is not an UnaryGate" typeName
+
+                | Instantiate (gateType, gateName) ->
+                    try
+
+                        let typeFinder = new Predicate<GateType>(function | Custom (typeName, _, _, _) -> true | _ -> false)
+
+                        let t = typeList.Find typeFinder
+
+                        match t with
+                        | Custom (typeName, inputNames, outputNames, outputFunctions) ->
+
+                            let inNamesLength = inputNames.Length
+                            let outNamesLength = outputNames.Length
+                            if inNamesLength = 0 || outputNames.Length = 0 then failwith "Custom gate %s must define input and output names" else
+                            if outNamesLength <> outputFunctions.Length 
+                                then failwithf "The number of output functions does not match the number of inputs for custom gate %s" typeName
+                            else
+                                let truthTable = getTruthTable inputNames outputNames outputFunctions
+                                truthTable |> Array.iter (fun (name, dict) -> printfn "%s %A" name dict)
+
+                                // Temporary for debugging purposes. Make the original function do this from the beginning...
+                                let truthTable = truthTable |> Array.map (fun (_,dict) -> dict)
+
+                                let inputs = inputNames |> ResizeArray<string>
+                                let outputs = outputNames |> ResizeArray<string>
+
+                                circuit.Add(new CustomGate(gateName, inNamesLength, outNamesLength, inputs, outputs, truthTable))
+                        | _ -> failwithf "You cannot instantiate non-Custom gates"
+
+                    with
+                    | :? ArgumentNullException -> failwithf "A custom gate of type %s could not be found" gateType
+
+                | Define (Custom (name, inputNames, outputNames, outputFunctions)) ->
+
+                    typeList.Add(Custom (name, inputNames, outputNames, outputFunctions))
+
+                
+                (*
+                MyDecoder.H :- SumOr, 4
+                MyDecoder.H :- SumOr, 4; CarryOr, 4
+
+                ConnectList of sourceName * source.Output * (targetName * target.Input) list
+
+                Trying to allow a gate's output to be connected to the input on many other gates with one statement
+                sourceGate[.outputName] :- targetGate, targetInput list
+                *)
+                | ConnectList (sourceName, sourceOutput, targets) ->
+                    printfn "Connecting %A" (sourceName, sourceOutput, targets)
+                    // Search the circuit to find gates that are already defined
+                    try
+                        let sourceGate = circuit.Find(fun x -> x.Name = sourceName)
+                        if sourceGate = null then failwithf "Source gate '%s' is not defined" sourceName
+
+                        targets |> List.iter (fun (targetName, targetNode) ->
+                    
+                            try
+                                let targetGate = circuit.Find(fun x -> x.Name = targetName)
+                                if targetGate = null then failwithf "Source gate '%s' is not defined" sourceName
+
+                                let intNode = 
+                                    match targetNode with
+                                    | NodeNumber n -> n
+                                    | NodeName stringNode -> 
+                                        let x = targetGate.GetIndexForInputName(stringNode)
+                                        if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringNode else x
+
+                                match sourceOutput with
+                                | None -> // Single output gate. sourceGate should only be and, or, not, etc.
+                                    match sourceGate with
+                                        | :? SingleOutputGate as s -> s.AddConnection(new OutputConnection(targetGate, intNode))
+                                        | :? MultipleOutputGate as m -> failwithf "%s must specify an output node choice" m.Name
+                                        | _ -> printfn "Error in Connect, OneOut, NodeChoice for %s" sourceGate.Name
+
+                                | Some (outputChoice) -> // Multiple output gate. sourceGate should only be decoder, custom, etc.
+                                    match sourceGate with
+                                    | :? SingleOutputGate as s -> failwithf "%s does not have multiple outputs" s.Name
+                                    | :? MultipleOutputGate as m -> 
+                                        match outputChoice with // Match on the output node of the source gate second.
+                                        | NodeNumber outputNodeNumber ->
+                                            m.AddConnectionTo(new OutputConnection(targetGate, intNode), outputNodeNumber)
+                                        | NodeName outputNodeName ->
+                                            match m.GetIndexForOutputName(outputNodeName) with
+                                            | x when x = -1 -> failwithf "Gate %s does not have an output with the name %s" m.Name outputNodeName
+                                            | outputNumber -> m.AddConnectionTo(new OutputConnection(targetGate, intNode), outputNumber-1)
+                                    | _ -> printfn "Error in Connect, ManyOut, InputNode for %s" sourceGate.Name
+                    
+                            with
+                            | :? ArgumentNullException ->
+                                raise (GateNotDefinedException("Target gate " + targetName + " is not defined"))
+                        )
+                    with 
+                    | :? ArgumentNullException ->
+                        raise (GateNotDefinedException("Source gate " + sourceName + " is not defined"))
+
+                | Connect (sourceName, targetName, outputType) ->
+                    printfn "Connecting %A" (sourceName, targetName, outputType)
+                    // Search the circuit to find gates that are already defined
+                    try
+                        let sourceGate = circuit.Find(fun x -> x.Name = sourceName)
+                        if sourceGate = null then failwithf "Source gate '%s' is not defined" sourceName
+
+                        try
+                            let targetGate = circuit.Find(fun y -> y.Name = targetName)
+                            if targetGate = null then failwithf "Target gate '%s' is not defined" targetName
+
+                            match outputType with
+                            | OneOut targetNode ->
+
+                                let intNode = 
+                                    match targetNode with
+                                    | NodeNumber n -> n
+                                    | NodeName stringNode -> 
+                                        let x = targetGate.GetIndexForInputName(stringNode)
+                                        if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringNode else x
+                            
+                                match sourceGate with
+                                    | :? SingleOutputGate as s -> s.AddConnection(new OutputConnection(targetGate, intNode))
+                                    | :? MultipleOutputGate as m -> failwithf "%s must specify an output node choice" m.Name
+                                    | _ -> printfn "Error in Connect, OneOut, NodeChoice for %s" sourceGate.Name
+                            
+                            | ManyOut (targetNode, outputNode) ->
+
+                                let intInput = 
+                                    match targetNode with // Match on the target node first using integer or name indexing.
+                                    | NodeNumber intInput -> intInput 
+                                    | NodeName stringInput -> 
+                                        let x = targetGate.GetIndexForInputName(stringInput)
+                                        if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringInput else x
+
+                                match sourceGate with // Then match on the source node using integer or name indexing
+                                | :? SingleOutputGate as s -> failwithf "%s does not have multiple outputs" s.Name
+                                | :? MultipleOutputGate as m -> 
+                                    match outputNode with // Match on the output node of the source gate second.
+                                    | NodeNumber outputNodeNumber ->
+                                        m.AddConnectionTo(new OutputConnection(targetGate, intInput), outputNodeNumber)
+                                    | NodeName outputNodeName ->
+                                        match m.GetIndexForOutputName(outputNodeName) with
+                                        | x when x = -1 -> failwithf "Gate %s does not have an output with the name %s" m.Name outputNodeName
+                                        | outputNumber -> m.AddConnectionTo(new OutputConnection(targetGate, intInput), outputNumber-1)
+                                | _ -> printfn "Error in Connect, ManyOut, InputNode for %s" sourceGate.Name
+
+                                    
+                                // Input node range checking must be done in the constructors...
+                            
+                        with
+                        | :? ArgumentNullException ->
+                            raise (GateNotDefinedException("Target gate " + targetName + " is not defined"))
+                    with 
+                    | :? ArgumentNullException ->
+                        raise (GateNotDefinedException("Source gate " + sourceName + " is not defined"))
+            printfn "\nEnd of Parsing Stage\n\n"
+        inner statements
+        circuit
+                    
 
     [<EntryPoint>]
     let main argv = 

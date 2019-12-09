@@ -1,0 +1,4 @@
+﻿define MyOr(a, b, c, d : out)
+{
+    out <- a + b + c + d;
+}

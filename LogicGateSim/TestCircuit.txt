@@ -1,19 +1,12 @@
-﻿Input Input1
+﻿
+load "source.txt"
+
+Input Input1
 Input Input2
 Input Input3
-
-Or4 SumOr
-Or4 CarryOr
-
 Output Sum
 Output Carry
-
 Decoder3 decoder
-
-define MyOr(a, b, c, d : out)
-{
-    out <- a + b + c + d;
-}
 
 MyOr(sumOr)
 MyOr(carryOr)
