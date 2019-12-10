@@ -83,6 +83,7 @@ namespace LogicGateDomain
         private bool[] areInputsUpdated;
         private bool[] areControlsUpdated;
         
+        // Inputs for a Multiplexer4 given as (control1, control2, input1, input2, input3, input4).
         public Multiplexer(string name, int inputCount, List<string> inputNameList) : base(name, inputCount, inputNameList)
         {
             controlCount = (int)(Math.Log(inputCount) / Math.Log(2));

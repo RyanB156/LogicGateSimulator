@@ -1,30 +1,15 @@
-﻿
-load "source.txt"
+﻿Input in1
+Input in2
+Decoder2 dec(a, b)
+Output out1
+Output out2
+Output out3
+Output out4
 
-Input Input1
-Input Input2
-Input Input3
-Output Sum
-Output Carry
-Decoder3 decoder
+in1 :- dec, a
+in2 :- dec, b
 
-MyOr(sumOr)
-MyOr(carryOr)
-
-Input1 :- decoder, 1 // Reference inputs to the next gate with <next gate name>, <input name (or number if using the default gates)>
-Input2 :- decoder, 2
-Input3 :- decoder, 3
-
-decoder.1 :- sumOr, a // Gate outputs are 0 indexed, so decoder.1 refers to the second output (minterm 001)
-decoder.2 :- sumOr, b
-decoder.4 :- sumOr, c
-
-decoder.3 :- carryOr, 1
-decoder.5 :- carryOr, 2
-decoder.6 :- carryOr, 3
-
-decoder.7 :- sumOr, d; carryOr, 4
-
-sumOr.out :- Sum
-carryOr.out :- Carry
-
+dec.0 :- out1
+dec.1 :- out2
+dec.2 :- out3
+dec.3 :- out4

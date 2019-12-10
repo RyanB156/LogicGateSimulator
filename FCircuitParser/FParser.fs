@@ -2,21 +2,6 @@
 
 module FParser =
 
-(*
-    <GateType>[input count][(In1Name, In2Name, ..., InNName [: Out1Name, ..., OutNName])]
-    <source gate name>[.<output number> (0 indexed)] :- <target gate name>[, <target gate input choice> (1 indexed)]
-    create <gateName>(In1Name, ..., InNName : Out1Name, ..., OutNName)
-    {
-        Out1Name <- (Boolean expression using [', ., +, =>, ==, <>], 1, 0) ; [// <comment>]
-        ...; 
-        OutNName <- ... ;
-    }
-    [// <comment>]
-    [/* <block comment> */]
-
-    Multiplexer: Inputs 1, 2, 3, 4, 5, 6 (1, 2 controls) (3-6 inputs)
-*)
-
     open FParsec
 
     module CircuitTypes =
@@ -56,7 +41,7 @@ module FParser =
         //
 
         type Identifier = string
-        type FileName = string
+        type FilePath = string
         type InputNode = int
         type OutputNode = int
         type InputCount = int
@@ -85,7 +70,7 @@ module FParser =
 
         type Statement = 
             | Comment
-            | Load of FileName
+            | Load of FilePath
             | Define of GateType
             | Instantiate of Identifier * Identifier // MyGate (gate1)
             | Connect of Identifier * Identifier * OutputType
@@ -248,7 +233,7 @@ module FParser =
     let pOutputNames = str_wsopt "(" >>. str_wsopt ":" >>. sepBy (wsopt >>. identifier) (pchar ',') .>> str_wsopt ")"
 
     let pDeclaredNames = str_wsopt "(" >>. opt (sepBy (wsopt >>. identifier) (pchar ',')) 
-                            .>>. opt (str_wsopt ":" >>. (sepBy (str_wsopt " " >>. identifier) (pchar ','))) .>> str_wsopt ")"
+                            .>>. opt (str_wsopt ":" >>. (sepBy (wsopt >>. identifier) (pchar ','))) .>> str_wsopt ")"
                             <!> "Declared Names"
 
     let declareToLists declareOpt =
@@ -341,7 +326,7 @@ module FParser =
         | Success(result, _, _)   -> printfn "Success: %A" result
         | Failure(errorMsg, _, _) -> printfn "Failure: %s" errorMsg
 
-    let getProgram str = 
+    let parseProgram str = 
         //printfn "%A" str
         runParserOnString document (UserState.Create()) "" str
 

@@ -1,0 +1,156 @@
+﻿[load <"filepath">]
+<GateType>[input count][(In1Name, In2Name, ..., InNName [: Out1Name, ..., OutNName])]
+<source gate name>[.<output number> (0 indexed)] :- <target gate name>[, <target gate input choice> (1 indexed)]
+define <custom gate type name>(In1Name, ..., InNName : Out1Name, ..., OutNName)
+{
+    Out1Name <- (Boolean expression using [', ., +, =>, ==, <>], 1, 0) ; [// <comment>]
+    ...; 
+    OutNName <- ... ;
+}
+<custom gate type name>(<custom gate name>)
+[// <comment>]
+[/* <block comment> */]
+
+--Inputs and Outputs for Logic Gates--
+
+    Gates can have either a single input or multiple inputs and a single output or multiple outputs
+
+    1-input gates are connected to from a 1-output gate by "<source gate name> :- <target gate name>"
+    1-input gates are connected to from a n-output gate by "<source gate name>.<0-indexed output number> :- <target gate name>"
+    n-input gates are connected to from a 1-output gate by "<source gate name> :- <target gate name>, <1-indexed input number>"
+    n-input gates are connected to from a n-output gate by "<source gate name>.<0-indexed output number> :- <target gate name>, <1-indexed input number>"
+
+    Gates can have user defined names assoiated with their inputs and outputs
+
+    E.G. "And2 and(a, b)" will create a 2-input And gate that can be connected to using "sourceGate :- and, <a|b>"
+    
+    Single output gates like And, Or, Not, etc. do not support named outputs
+    Only Custom gates, Decoders, and FlipFlops support this
+
+    E.G. "Decoder2 dec(a, b : A, B, C, D)" will create a Decoder2 where output 0 can be connected to another gate using "dec.A :- targetGate"
+
+    *If any input names are specified then all must be specified. Output names are optional, but if any are specified then all must be specified.
+    *All input and output names are mandatory for Custom gates
+
+--End Inputs and Outputs for Logic Gates--
+
+--Canonical Logic Gates--
+    The following gates are supported:
+        And - A.B
+        Or - A+B
+        Xor - A^B or AB' + A'B
+        Nand - (A.B)'
+        Nor - (A+B)'
+        Xnor - A=B
+        Not - A'
+        Identity - A
+        True - 1
+        False - 0
+
+    These gates are added to provide a user interface into the circuit:
+        Input - Set the value of inputs to the circuit. These are displayed as a button which can be clicked to toggle the value True or False.
+        Output - Display the outputs of the circuit. These are displayed as colored labels.
+
+        Both of these will be displayed with a name matching the one defined in the program.
+
+    Sample Program:
+
+    Input input1
+    Input input2
+    Input input3
+    Output out
+    And3 and
+    // The canonical gates can be defined with <gate type name><input number> <gate name> where the gate type name has the first letter capitalized.
+
+    input1 :- and, 1
+    input2 :- and, 2
+    input3 :- and, 3
+    and :- out
+
+    // This program defines three outputs and produces output to "out" based on the values of the three inputs with a 3-input And gate.
+
+--End Canonical Logic Gates--
+
+--MSI Gates--
+
+| Decoder
+| Multiplexer
+| DFlipFlop
+| TFlipFlop
+| JKFlipFlop
+
+--Decoder--
+
+    Defined in a program by "Decoder<input count> <decoder name>"
+
+    Takes N control inputs and activates one of its 2^N outputs according to the binary value of the inputs
+    E.G. for a Decoder3, inputs [0, 1, 0] will activate the third output, output 2
+    Output values are accessed by "<decoder name>.o" where o is a 0-indexed integer corresponding to each of the 0..2^n-1 outputs
+
+    Sample Program:
+
+    Input in1
+    Input in2
+    Decoder2 dec
+    Output out1
+    Output out2
+    Output out3
+    Output out4
+
+    in1 :- dec, 1
+    in2 :- dec, 2
+    dec.0 :- out1
+    dec.1 :- out2
+    dec.2 :- out3
+    dec.3 :- out4
+
+--End Decoder--
+
+--Multiplexer--
+
+    Defined in program by "Multiplexer<control count> <multiplexer name>"
+    "MultiplexerN mux" creates a multiplexer with N control inputs and must have 2^N data inputs filled
+    E.G. "Multiplexer2 mux" creates a multiplexer with 2 control inputs and must have 4 data inputs
+
+    Sample Program:
+
+    Input Input4
+    Multiplexer2 mux
+    True t
+    False f
+    Output MuxOut
+
+    Input4 :- mux, 1
+    t :- mux, 2
+    f :- mux, 3
+    mux :- MuxOut
+
+    // Multiplexers send one of their inputs to the single output based on the control signal
+    // The mux output is equivalent to (Input4 == 0) ? true : false
+    // Multiplexer inputs are given as control inputs first (mux, 1) followed by data inputs (mux, 2) and (mux, 3)
+
+--End Multiplexer--
+
+--DFlipFlop--
+
+    Sets the output to be the value of its input 
+
+    Sample Program:
+        Input x
+        Input y
+        Xor2 x1
+        Xor2 x2
+
+        DFlipFlop f
+        Output out
+
+        x :- x1, 1
+        y :- x1, 2
+        x1 :- x2, 2
+        f.0 :- x2, 1
+        x2 :- f
+        f.0 :- out
+
+        // Uses a DFlipFlop to make the output alternate between true and false when the x != y
+
+--End DFlipFlop--

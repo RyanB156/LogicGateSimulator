@@ -148,7 +148,7 @@ module Parser =
         use sr = new StreamReader(path)
         let text = sr.ReadToEnd() + "\n"
 
-        match FParser.getProgram text with
+        match FParser.parseProgram text with
         | Success (result,_,_) ->
             let codeStrList = new List<Statement>()
             for i in result do
@@ -171,7 +171,7 @@ module Parser =
                 printfn "Checking: %A" cmd
                 match cmd with
                 | Comment -> ()
-                | Load filename -> printfn "Loading %s" filename; getProgram filename |> inner
+                | Load filePath -> printfn "Loading %s" filePath; getProgram filePath |> inner
                 | Define (NaryGate (typeName, name, inputCount, inputNames, outputNames)) -> 
                     let namesCount = inputNames.Length
                     if namesCount > inputCount && typeName <> Gate.Multiplexer then failwithf "Gate %s has too many named inputs" name else
