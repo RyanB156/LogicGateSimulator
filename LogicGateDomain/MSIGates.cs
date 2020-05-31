@@ -161,6 +161,7 @@ namespace LogicGateDomain
 
         private void SendOutput()
         {
+            // Qt+1 = D.
             foreach (var c in OutputMap[0])
                 c.TargetGate.Activate(c.InputNode, D);
 
@@ -196,7 +197,7 @@ namespace LogicGateDomain
 
         private void SendOutput()
         {
-            State ^= T;
+            State ^= T; // Qt+1 = Q^T.
 
             foreach (var c in OutputMap[0])
                 c.TargetGate.Activate(c.InputNode, State);

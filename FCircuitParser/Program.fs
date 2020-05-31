@@ -63,57 +63,57 @@ module Parser =
 
     // Checks if the parsed result returned two gates with the same name. This would lead to an incorrect pairing and a stackoverflow when trying to activate
         // the resulting loop.
+
+    // | ConnectList of Identifier * NodeChoice option * (Identifier * NodeChoice) list
+
     let areDuplicatedNames statements =
         statements
-        |> Seq.tryFind(function | Connect (sName, tName, _) when sName = tName -> true | _ -> false)
-        |> (function | Some (Connect(sName, tName, _)) -> failwithf "Gates %s and %s have conflicting names" sName tName | _ -> ())
-            
-    (*
-    type Expr =
-        | Value of bool
-        | Variable of Identifier
-        | PostFixOp of Expr * string
-        | InfixOp of Expr * string * Expr
-    *)
-
-    (*
-    Create big function to take a list of all the possible bool[]'s for the truth table and the valid inputs matched to each column.
-    This will create Dictionary<bool[], bools>(BoolEqualityComparer)'s that map the input to each output function specified.
-    Intermediate Maps from the input identifiers to each row for the inputs on the truth table.
-
-    Failure modes:
-        Undeclared output in the function √
-        Undeclared input in the function √
-        Wrong number of output functions for the number of declared outputs √
-
-    Output lookup will be performed by doing outputF[InputStates]. Each input will be triggered and updated by the 
+        |> Seq.iter (fun s -> 
+            match s with
+            | ConnectList (sName, _, list) ->  
+                if list |> List.map fst |> List.contains sName
+                then failwithf "Gates %s and %s have conflicting names" sName sName
+            | _ -> ())
+        
 
     
-    Two inputs -> {false, false}, {false, true}, {true, false}, {true, true}
-    A <- (In1.In2)';    -> Aoutput.Add({false, false}, true; {false, true}, true; {true, false}, true; {true, true}, false)
-    B <- In1==In2;      -> Boutput.Add({false, false}, true; {false, true}, false; {true, false}, false; {true, true}, true)
-    C <- In1 + In2';    -> Coutput.Add({false, false}, true; {false, true}, false; {true, false}, true; {true, true}, true)
-    *)
+    // Creates an array of string * Dictionary<int, bool> pairs that represent the truth table for each of the functions that have a matching
+    //  name in "outputNames"
+    // The remaining functions are taken as user defined variables to simplify large expression and reduce code repetition.
+    // First, a list of all possible input states is generated based on the length of "inputNames"
+    // Second, the list of all input states is iterated through and evaluated against each function. If the function is for an output then its value
+    //  is put in "outputs" otherwise its value is put in "variables". 
+    //  These are inserted as dict[var|out name][inputState] = (inputState, f(inputState))
+    // Input states are stored in the dictionaries as an integer to make lookups easier
+    let getTruthTable (inputNames: string list) (outputNames: string list) functions =
 
-    // outputFunctions is the [A <-..., B <-..., C <-...] above. (as "A", expr...; "B", expr...; "C", expr...;)
-    // Map over these with the dictionary that represents the truth table for each function.
-    let getTruthTable (inputNames: string list) (outputNames: string list) outputFunctions =
+        let mintermDigits bs = bs |> Array.fold (fun s t -> s * 2 + if t then 1 else 0) 0
+
         let inputPerms = BinaryPermutations.allInputStates inputNames.Length
 
-        //let inops = [".", 3; "+", 3; "=>", 2; "==", 2; "<>", 2] // And, Or, IfThen, XNor, XOr, Assign.
+        let variables = new Dictionary<string, Dictionary<int, bool>>() // Mapping of variable name to its truth table.
+        let outputs = new Dictionary<string, Dictionary<int, bool>>()
         
+
         let evalOutputFunctions expr (inputStates: bool[]) =
             let rec inner exp = 
                 match exp with
                 | Value b -> b
                 | Variable identifier ->
                     match inputNames |> List.tryFindIndex ((=) identifier) with
-                    | None -> failwithf "%s is not a declared input" identifier
+                    | None -> 
+                        match variables.ContainsKey identifier with
+                        | false -> failwithf "%s is not a declared input or variable in %A" identifier expr
+                        | true -> 
+                            printfn "Looking up value for %s as variable" identifier
+                            try variables.[identifier].[mintermDigits inputStates]
+                            with :? KeyNotFoundException as e -> failwith e.Message
+                        // ^ *** Change this to pull value for a variable.
                     | Some i -> inputStates.[i]
                 | PostFixOp (e, str) -> 
                     match str with
                     | "'" -> not (inner e)
-                    | _ -> failwithf "%s is not a falid postfix operator" str
+                    | _ -> failwithf "%s is not a valid postfix operator in %A" str expr
                 | InfixOp (e1, str, e2) ->
                     match str with
                     | "." -> (inner e1) && (inner e2)
@@ -121,28 +121,32 @@ module Parser =
                     | "=>" -> not (inner e1) || ((inner e1) && (inner e2))
                     | "==" -> (inner e1) = (inner e2)
                     | "<>" -> (inner e1) <> (inner e2)
-                    | _ -> failwithf "%s is not a valid infix operator" str
+                    | _ -> failwithf "%s is not a valid infix operator in %A" str expr
             inner expr
 
-        let functionMapper expr =
-            let table = new Dictionary<bool[], bool>(new BoolArrayComparer())
-            for bools in inputPerms do
-                table.Add(bools, evalOutputFunctions expr bools)
-            table
-        // Pair output with its logic function as a truth table.
-        let out = 
-            outputFunctions |> List.map (fun (outputLabel, f) -> 
-            match outputNames |> List.contains outputLabel with
-            | false -> failwithf "%s is not a declared output" outputLabel
-            | true -> outputLabel, (functionMapper f))
-        // Ensure that the truth tables are arranged in the order in which the outputs are declared.
-        outputNames 
-        |> List.map 
-            (fun name -> 
-                match out |> List.tryFind (fun (n, f) -> n = name) with 
-                | None -> failwith "Error matching function to proper output"
-                | Some (_, func) -> name, func)
-        |> List.toArray
+        (* 
+        
+            Issues:
+                Differentiating between inputs and variables
+                    
+        *)
+
+        let newWay = 
+            outputNames |> List.iter (fun str -> outputs.Add(str, new Dictionary<int, bool>()))
+            inputPerms |> List.iter (fun inputs ->
+                variables.Clear() // Remove stored values for variables
+                for (n, f) in functions do
+                    let b = evalOutputFunctions f inputs
+                    if outputs.ContainsKey n then 
+                        outputs.[n].Add(mintermDigits inputs, b)
+                    else 
+                        if variables.ContainsKey n |> not then variables.Add(n, new Dictionary<int, bool>()) else ()
+                        variables.[n].Add(mintermDigits inputs, b)
+                    |> ignore
+            )
+            [| for key in outputs.Keys do yield (key, outputs.[key]) |]
+
+        newWay
 
     let getProgram (path:string) =
         use sr = new StreamReader(path)
@@ -157,9 +161,20 @@ module Parser =
         
         | Failure (msg,_,_) -> raise (new LogicGateDomain.ParserErrorException(msg))
 
+    let getProgramFromString (program:string) =
+        let program = program + "\n"
+        match FParser.parseProgram program with
+        | Success (result,_,_) ->
+            let codeStrList = new List<Statement>()
+            for i in result do
+                codeStrList.Add(i)
+            codeStrList
+        
+        | Failure (msg,_,_) -> raise (new LogicGateDomain.ParserErrorException(msg))
+
     let getCircuit statements =
         let circuit = new List<LogicGate>()
-        let mutable typeList = new ResizeArray<GateType>()
+        let typeList = new ResizeArray<GateType>()
 
         let rec inner statements = 
 
@@ -206,49 +221,44 @@ module Parser =
 
                 | Instantiate (gateType, gateName) ->
                     try
-
-                        let typeFinder = new Predicate<GateType>(function | Custom (typeName, _, _, _) -> true | _ -> false)
-
+                        let typeFinder = new Predicate<GateType>(function | Custom (_, _, _, _) -> true | _ -> false)
                         let t = typeList.Find typeFinder
 
                         match t with
-                        | Custom (typeName, inputNames, outputNames, outputFunctions) ->
+                        | Custom (_, inputNames, outputNames, outputFunctions) ->
 
                             let inNamesLength = inputNames.Length
                             let outNamesLength = outputNames.Length
                             if inNamesLength = 0 || outputNames.Length = 0 then failwith "Custom gate %s must define input and output names" else
-                            if outNamesLength <> outputFunctions.Length 
-                                then failwithf "The number of output functions does not match the number of inputs for custom gate %s" typeName
-                            else
-                                let truthTable = getTruthTable inputNames outputNames outputFunctions
-                                truthTable |> Array.iter (fun (name, dict) -> printfn "%s %A" name dict)
+                            
+                            // Ensure that there are no name conflicts between inputs and user-defined variables.
+                            let outputsAssigned = outputFunctions |> List.map fst
+                            for input in inputNames do
+                                if outputsAssigned |> List.contains input then failwithf "%s cannot be defined as a variable. %s already exists as an input" input input
+                            // Ensure that there are no name conflicts between outputs and user-defined variables.
+                            outputsAssigned
+                            |> List.sort
+                            |> List.fold (fun s t -> if s = t then failwithf "%s cannot be assigned to more than once" s else t) ""
+                            |> ignore
 
-                                // Temporary for debugging purposes. Make the original function do this from the beginning...
-                                let truthTable = truthTable |> Array.map (fun (_,dict) -> dict)
+                            let truthTable = getTruthTable inputNames outputNames outputFunctions
+                            truthTable |> Array.iter (fun (name, dict) -> printfn "%s %A" name dict)
 
-                                let inputs = inputNames |> ResizeArray<string>
-                                let outputs = outputNames |> ResizeArray<string>
+                            let truthTable = truthTable |> Array.map (fun (_,dict) -> dict)
 
-                                circuit.Add(new CustomGate(gateName, inNamesLength, outNamesLength, inputs, outputs, truthTable))
+                            // Convert F# list to C# generic list.
+                            let inputs = inputNames |> ResizeArray<string>
+                            let outputs = outputNames |> ResizeArray<string>
+
+                            circuit.Add(new CustomGate(gateName, inNamesLength, outNamesLength, inputs, outputs, truthTable))
                         | _ -> failwithf "You cannot instantiate non-Custom gates"
 
                     with
                     | :? ArgumentNullException -> failwithf "A custom gate of type %s could not be found" gateType
 
                 | Define (Custom (name, inputNames, outputNames, outputFunctions)) ->
-
                     typeList.Add(Custom (name, inputNames, outputNames, outputFunctions))
 
-                
-                (*
-                MyDecoder.H :- SumOr, 4
-                MyDecoder.H :- SumOr, 4; CarryOr, 4
-
-                ConnectList of sourceName * source.Output * (targetName * target.Input) list
-
-                Trying to allow a gate's output to be connected to the input on many other gates with one statement
-                sourceGate[.outputName] :- targetGate, targetInput list
-                *)
                 | ConnectList (sourceName, sourceOutput, targets) ->
                     printfn "Connecting %A" (sourceName, sourceOutput, targets)
                     // Search the circuit to find gates that are already defined
@@ -296,63 +306,7 @@ module Parser =
                     with 
                     | :? ArgumentNullException ->
                         raise (GateNotDefinedException("Source gate " + sourceName + " is not defined"))
-
-                | Connect (sourceName, targetName, outputType) ->
-                    printfn "Connecting %A" (sourceName, targetName, outputType)
-                    // Search the circuit to find gates that are already defined
-                    try
-                        let sourceGate = circuit.Find(fun x -> x.Name = sourceName)
-                        if sourceGate = null then failwithf "Source gate '%s' is not defined" sourceName
-
-                        try
-                            let targetGate = circuit.Find(fun y -> y.Name = targetName)
-                            if targetGate = null then failwithf "Target gate '%s' is not defined" targetName
-
-                            match outputType with
-                            | OneOut targetNode ->
-
-                                let intNode = 
-                                    match targetNode with
-                                    | NodeNumber n -> n
-                                    | NodeName stringNode -> 
-                                        let x = targetGate.GetIndexForInputName(stringNode)
-                                        if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringNode else x
                             
-                                match sourceGate with
-                                    | :? SingleOutputGate as s -> s.AddConnection(new OutputConnection(targetGate, intNode))
-                                    | :? MultipleOutputGate as m -> failwithf "%s must specify an output node choice" m.Name
-                                    | _ -> printfn "Error in Connect, OneOut, NodeChoice for %s" sourceGate.Name
-                            
-                            | ManyOut (targetNode, outputNode) ->
-
-                                let intInput = 
-                                    match targetNode with // Match on the target node first using integer or name indexing.
-                                    | NodeNumber intInput -> intInput 
-                                    | NodeName stringInput -> 
-                                        let x = targetGate.GetIndexForInputName(stringInput)
-                                        if x = -1 then failwithf "Gate %s does not have an input with the name %s" sourceName stringInput else x
-
-                                match sourceGate with // Then match on the source node using integer or name indexing
-                                | :? SingleOutputGate as s -> failwithf "%s does not have multiple outputs" s.Name
-                                | :? MultipleOutputGate as m -> 
-                                    match outputNode with // Match on the output node of the source gate second.
-                                    | NodeNumber outputNodeNumber ->
-                                        m.AddConnectionTo(new OutputConnection(targetGate, intInput), outputNodeNumber)
-                                    | NodeName outputNodeName ->
-                                        match m.GetIndexForOutputName(outputNodeName) with
-                                        | x when x = -1 -> failwithf "Gate %s does not have an output with the name %s" m.Name outputNodeName
-                                        | outputNumber -> m.AddConnectionTo(new OutputConnection(targetGate, intInput), outputNumber-1)
-                                | _ -> printfn "Error in Connect, ManyOut, InputNode for %s" sourceGate.Name
-
-                                    
-                                // Input node range checking must be done in the constructors...
-                            
-                        with
-                        | :? ArgumentNullException ->
-                            raise (GateNotDefinedException("Target gate " + targetName + " is not defined"))
-                    with 
-                    | :? ArgumentNullException ->
-                        raise (GateNotDefinedException("Source gate " + sourceName + " is not defined"))
             printfn "\nEnd of Parsing Stage\n\n"
         inner statements
         circuit

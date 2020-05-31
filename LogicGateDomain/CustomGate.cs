@@ -8,17 +8,17 @@ namespace LogicGateDomain
 {
     // Gates can 1:M outputs, so cover all cases.
     // Create a custom gate with different numbers of inputs and outputs.
-    // "outputFunctions" acts as the truth table for the gate. This gets the output based
+    // "outputFunctions" acts as the truth table for the gate. This gets the output based on the input values.
     public class CustomGate : MultipleOutputGate
     {
         private bool[] outputs; // bool value for each output determined by the activation inputs and the truth tables.
         private int outputCount;
-        private Dictionary<bool[], bool>[] outputFunctions;
+        private Dictionary<int, bool>[] outputFunctions;
         private bool[] inputs;
         private bool[] areInputsUpdated;
 
         public CustomGate(string name, int inputCount, int outputCount, List<string> inputNameList,
-            List<string> outputNameList, Dictionary<bool[], bool>[] outputFunctions)
+            List<string> outputNameList, Dictionary<int, bool>[] outputFunctions)
             : base(name, inputCount, outputCount, inputNameList, outputNameList)
         {
             outputs = new bool[outputCount];
@@ -28,13 +28,23 @@ namespace LogicGateDomain
             this.outputFunctions = outputFunctions;
         }
 
+        public static int MintermDigit(bool[] arr)
+        {
+            int ret = 0;
+            for (int i = 0; i < arr.Length; i++)
+            {
+                ret *= 2;
+                ret += arr[i] ? 1 : 0;
+            }
+            return ret;
+        }
+
         // Update outputs based on the truth tables in "outputFunctions".
         private void UpdateOutputs()
         {
             for (int i = 0; i < outputFunctions.Length; i++)
             {
-                bool outputState = outputFunctions[i][inputs]; // Could throw an exception...
-                outputs[i] = outputState;
+                outputs[i] = outputFunctions[i][MintermDigit(inputs)];
             }
         }
 
@@ -44,7 +54,7 @@ namespace LogicGateDomain
             {
                 foreach (var connection in OutputMap[i])
                 {
-                    connection.TargetGate.Activate(connection.InputNode, outputs[i]); // Throws a stack overflow exception.
+                    connection.TargetGate.Activate(connection.InputNode, outputs[i]);
                 }
             }
         }

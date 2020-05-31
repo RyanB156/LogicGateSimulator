@@ -71,13 +71,54 @@ define <custom gate type name>(In1Name, ..., InNName : Out1Name, ..., OutNName)
 
 --End Canonical Logic Gates--
 
+--Custom Gates--
+
+    User defined gates are supported. These must be defined and then instantiated.
+
+    The general syntax is as follows:
+        // Definition
+        define <type-name>(<input-names>+ : <output-names>+)
+        {
+            <output-name | variable-name> <- <boolean-expression>;
+        }
+        // Instantiation
+        <type-name>(gate-name)
+
+    Custom gates must specify at least one input and one output
+    All outputs must be assigned to
+    Variables are allowed inside the block for custom gates. The names of these must not conflict with inputs or outputs.
+
+    The following operators are allowed in boolean expressions:
+        p+q - p or q
+        p.q - p and q
+        p => q - if p then q
+        p == q - p xnor q
+        p <> q - p xor q
+        p' - not p
+
+    1 and 0 are allowed as literals for true and false
+
+    Sample Program:
+
+    Input in1
+    Input in2
+    Output out
+
+    define mygate(a, b : out)
+    {
+        temp <- a.b;
+        out <- temp;
+    }
+    mygate(mine)
+
+    in1 :- mine, a
+    in2 :- mine, b
+    mine.out :- out
+
+--End Custom Gates--
+
 --MSI Gates--
 
-| Decoder
-| Multiplexer
-| DFlipFlop
-| TFlipFlop
-| JKFlipFlop
 
 --Decoder--
 

@@ -64,18 +64,12 @@ module FParser =
             | NaryGate of Gate * Identifier * InputCount * Inputs * Outputs
             | Custom of Identifier * Inputs * Outputs * OutputFunction list
 
-        type OutputType =
-            | OneOut of NodeChoice // source.Output
-            | ManyOut of NodeChoice * NodeChoice // target.Input * source.Output
-
         type Statement = 
             | Comment
             | Load of FilePath
             | Define of GateType
             | Instantiate of Identifier * Identifier // MyGate (gate1)
-            | Connect of Identifier * Identifier * OutputType
             | ConnectList of Identifier * NodeChoice option * (Identifier * NodeChoice) list
-            // | Connect of Identifier * NodeChoice option * (Identifier * NodeChoice) list
             //              sourceName     source.Output   (targetName   target.Input) list
         (*
         MyDecoder.H :- SumOr, 4
@@ -203,7 +197,7 @@ module FParser =
     let opp = OperatorPrecedenceParser<Expr,unit,UserState>()
 
     let pliteral = (pstring "1" |>> fun _ -> (Value true)) <|> (pstring "0" |>> fun _ -> (Value false))
-    let pvalue = pliteral <|> (identifier .>> wsopt |>> fun str -> Variable str)
+    let pvalue = pliteral <|> (identifier .>> wsopt |>> Variable)
 
     let term = between (str_wsopt "(") (str_wsopt ")") pexpr <|> pvalue
     opp.TermParser <- term
@@ -286,26 +280,12 @@ module FParser =
         
     let pConnector = ws1 >>. pstring ":-" <!> "pConnector"
 
-    let pConToNaryGate = pipe4 (pOutputType) (pConnector) (ws1 >>. identifier) (skipChar ',' >>. pInputNodeType)
-                            (fun (name,outChoice) _ target targetNode -> 
-                                match outChoice with
-                                | None -> Connect (name, target, (OneOut targetNode))
-                                | Some n -> Connect (name, target, (ManyOut (targetNode, n)))
-                            ) //<!> "Connect To Nary Gate"
-
-    let pConToUnaryGate = pipe3 (pOutputType) (pConnector) (ws1 >>. identifier)
-                            (fun (name,outChoice) _ target -> 
-                                match outChoice with
-                                | None -> Connect (name, target, (OneOut (NodeNumber 1)) ) // 1 is the default value for unary gates.
-                                | Some n -> Connect (name, target, (ManyOut (NodeNumber 1, n)))
-                            ) //<!> "Connect To Unary Gate"
-
     let connectList = pipe3 (pOutputType) (pConnector) (sepBy pTargetConnection (pchar ';' .>> opt ws1))
                         (fun (name, outOpt) _ connections -> 
                             let connections = connections |> List.map (function | (n, None) -> (n, NodeNumber 1) | (n, Some c) -> (n, c))
                             ConnectList(name, outOpt, connections))
     
-    let connect = connectList <!> "connect" //(attempt pConToNaryGate <|> pConToUnaryGate) .>> wsBeforeEOL
+    let connect = connectList <!> "connect"
 
     let pComment = comment |>> (fun _ -> Comment) <!> "PComment"
 
@@ -341,13 +321,17 @@ module FParser =
     feel well enough to do that right now :(
 
 
+    I want to allow intermediate variables to be defined inside the block for Custom gates but this will require a complete overhaul of that system.
+    Right now, the output functions for Custom gates are mapped directly to a dictionary using List.map which gives the bool output for each function
+    based on the values of all inputs.
+
+    The new system will require some way of assigning values to variables and then looking them up when the variable is used in an output assignment.
+    This will require setting the output assignment for by looping over each input then adding the output value for the input states to each of the 
+    outputs one at a time each pass. 
+
+
     Future Plans:
         Make clocks where they have to be defined and connected explicitly in the program. These will be found by the C# system to create timers for
             these and start them
-        √ Allow modules to be created in separate files and loaded in
-        Define custom gate types then instantiate them. Right now, defining a custom gate only gives one instance of the gate.
-        √ Allow connections to be made by specifying the output node and a list of target nodes
-            E.g. myAdder.sum :- out1; decoder2, 1
-
-        Write documentation for all gate types
+       
 *)
