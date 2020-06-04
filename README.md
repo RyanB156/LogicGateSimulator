@@ -29,16 +29,16 @@ Input Input1
 //Input Input2  
 //Input Input3  
   
-create myGate(a : o)  
+define myGate(a : o)  
 {  
     o <- a';  
 }  
-  
+myGate(myGate1)
 Output Output1  
   
   
-Input1 :- myGate, a  
-myGate.o :- Output1  
+Input1 :- myGate1, a  
+myGate1.o :- Output1  
   
 ----------------------  
   
@@ -66,9 +66,9 @@ create myGate(a, b, c : A, B, C, D, E, F, G, H)
     H <- a.b.c;  
 }  
   
-Input1 :- myGate, a // Reference inputs to the next gate with <next gate name>, <input name (or number if using the default gates)>  
-Input2 :- myGate, b  
-Input3 :- myGate, c  
+Input1 :- myGate1, a // Reference inputs to the next gate with <next gate name>, <input name (or number if using the default gates)>  
+Input2 :- myGate1, b  
+Input3 :- myGate1, c  
   
 myGate.B :- SumOr, 1  
 myGate.C :- SumOr, 2  
