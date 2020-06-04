@@ -11,7 +11,7 @@ namespace LogicGateDomain
 
     public abstract class NaryGate : SingleOutputGate
     {
-
+        public new string Type { get; private set; } = "NaryGate";
         protected bool[] inputStates;
         protected bool[] areInputsUpdated;
         // List or Array? Valid connections for an N input gate could be determined in the parser step.
@@ -39,7 +39,7 @@ namespace LogicGateDomain
             for (int i = 0; i < inputStates.Length; i++)
                 areInputsUpdated[i] = false;
 
-            output = false;
+            Output = false;
             IsFilled = false;
         }
 
@@ -51,7 +51,7 @@ namespace LogicGateDomain
         {
             foreach (var connection in ConnectedGates)
             {
-                connection.TargetGate.Activate(connection.InputNode, output);
+                connection.TargetGate.Activate(connection.InputNode, Output);
             }
         }
 
@@ -72,20 +72,22 @@ namespace LogicGateDomain
 
     public class AndGate : NaryGate
     {
+        public new string Type { get; private set; } = "AndGate";
         public AndGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            output = inputStates.Aggregate((a, b) => a && b);   
+            Output = inputStates.Aggregate((a, b) => a && b);   
             SendOutput();
         }
     }
 
     public class OrGate : NaryGate
     {
+        public new string Type { get; private set; } = "OrGate";
         public OrGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            output = inputStates.Aggregate((a, b) => a || b);
+            Output = inputStates.Aggregate((a, b) => a || b);
             SendOutput();
         }
     }
@@ -93,11 +95,12 @@ namespace LogicGateDomain
     // DifferentGate
     public class XorGate : NaryGate
     {
+        public new string Type { get; private set; } = "XorGate";
         public XorGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
 
         public override void CheckOutput()
         {
-            output = inputStates.Aggregate((a, b) => a ^ b);
+            Output = inputStates.Aggregate((a, b) => a ^ b);
             // output = AInput ^ BInput;
             SendOutput();
         }
@@ -106,10 +109,11 @@ namespace LogicGateDomain
     // EqualGate
     public class XnorGate : NaryGate
     {
+        public new string Type { get; private set; } = "XnoreGate";
         public XnorGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            output = !inputStates.Aggregate((a, b) => a ^ b);
+            Output = !inputStates.Aggregate((a, b) => a ^ b);
             //output = AInput == BInput;
             SendOutput();
         }
@@ -117,10 +121,11 @@ namespace LogicGateDomain
 
     public class NandGate : NaryGate
     {
+        public new string Type { get; private set; } = "NandGate";
         public NandGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            output = !inputStates.Aggregate((a, b) => a && b);
+            Output = !inputStates.Aggregate((a, b) => a && b);
             //output = !(AInput && BInput);
             SendOutput();
         }
@@ -128,10 +133,11 @@ namespace LogicGateDomain
 
     public class NorGate : NaryGate
     {
+        public new string Type { get; private set; } = "NorGate";
         public NorGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) { }
         public override void CheckOutput()
         {
-            output = !inputStates.Aggregate((a, b) => a || b);
+            Output = !inputStates.Aggregate((a, b) => a || b);
             //output = !(AInput || BInput);
             SendOutput();
         }

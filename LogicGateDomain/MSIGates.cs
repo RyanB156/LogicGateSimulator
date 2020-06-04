@@ -10,20 +10,21 @@ namespace LogicGateDomain
     // N inputs and 2^N outputs.
     public class NDecoder : MultipleOutputGate
     {
-        private int outputCount;
+        public new string Type { get; private set; } = "NDecoder";
+        public int OutputCount { get; private set; }
 
-        private bool[] inputStates;
-        private bool[] areInputsUpdated;
+        public bool[] InputStates { get; private set; }
+        public bool[] AreInputsUpdated { get; private set; }
 
         public NDecoder(string name, int inputCount, List<string> inputNameList, List<string> outputNameList) 
             : base(name, inputCount, (int)Math.Pow(2, inputCount), inputNameList, outputNameList)
         {
-            outputCount = (int)Math.Pow(2, inputCount);
-            inputStates = new bool[inputCount]; // Multiple inputs to keep track of.
-            areInputsUpdated = new bool[inputCount];
+            OutputCount = (int)Math.Pow(2, inputCount);
+            InputStates = new bool[inputCount]; // Multiple inputs to keep track of.
+            AreInputsUpdated = new bool[inputCount];
 
-            OutputMap = new List<OutputConnection>[outputCount];
-            for (int i = 0; i < outputCount; i++)
+            OutputMap = new List<OutputConnection>[OutputCount];
+            for (int i = 0; i < OutputCount; i++)
             {
                 OutputMap[i] = new List<OutputConnection>();
             }
@@ -31,10 +32,10 @@ namespace LogicGateDomain
 
         public override void Activate(int inputSide, bool input)
         {
-            inputStates[inputSide - 1] = input; // Input numbers are 1 indexed.
-            areInputsUpdated[inputSide - 1] = true;
+            InputStates[inputSide - 1] = input; // Input numbers are 1 indexed.
+            AreInputsUpdated[inputSide - 1] = true;
 
-            if (areInputsUpdated.ToList().TrueForAll(x => x))
+            if (AreInputsUpdated.ToList().TrueForAll(x => x))
             {
                 IsFilled = true;
                 SendOutput();
@@ -46,9 +47,9 @@ namespace LogicGateDomain
         private int InputMinTerm()
         {
             int term = 0;
-            for (int i = 0; i < inputStates.Length; i++)
+            for (int i = 0; i < InputStates.Length; i++)
             {
-                if (inputStates[i])
+                if (InputStates[i])
                     term += (int)Math.Pow(2, i);
             }
             return term;
@@ -61,7 +62,7 @@ namespace LogicGateDomain
             bool output;
             // Activate all gates connected to all outputs of the decoder.
 
-            for (int i = 0; i < outputCount; i++)
+            for (int i = 0; i < OutputCount; i++)
             {
                 output = i == outputChoice; // If the output is the active input based on the input state, that output is active. Otherwise, it is false.
 
@@ -76,41 +77,42 @@ namespace LogicGateDomain
     // Multiple inputs and 1 output.
     public class Multiplexer : SingleOutputGate
     {
-        private int controlCount;
+        public new string Type { get; private set; } = "Multiplexer";
+        public int ControlCount { get; private set; }
 
-        private bool[] inputStates;
-        private bool[] controlStates;
-        private bool[] areInputsUpdated;
-        private bool[] areControlsUpdated;
+        public bool[] InputStates { get; private set; }
+        public bool[] ControlStates { get; private set; }
+        public bool[] AreInputsUpdated { get; private set; }
+        public bool[] AreControlsUpdated { get; private set; }
         
         // Inputs for a Multiplexer4 given as (control1, control2, input1, input2, input3, input4).
         public Multiplexer(string name, int inputCount, List<string> inputNameList) : base(name, inputCount, inputNameList)
         {
-            controlCount = (int)(Math.Log(inputCount) / Math.Log(2));
+            ControlCount = (int)(Math.Log(inputCount) / Math.Log(2));
 
-            inputStates = new bool[inputCount];
-            areInputsUpdated = new bool[inputCount];
-            controlStates = new bool[controlCount];
-            areControlsUpdated = new bool[controlCount];
+            InputStates = new bool[inputCount];
+            AreInputsUpdated = new bool[inputCount];
+            ControlStates = new bool[ControlCount];
+            AreControlsUpdated = new bool[ControlCount];
 
             ConnectedGates = new List<OutputConnection>();
         }
 
         public override void Activate(int inputSide, bool input)
         {
-            if (inputSide >= 1 && inputSide <= controlCount)
+            if (inputSide >= 1 && inputSide <= ControlCount)
             {
-                controlStates[inputSide - 1] = input;
-                areControlsUpdated[inputSide - 1] = true;
+                ControlStates[inputSide - 1] = input;
+                AreControlsUpdated[inputSide - 1] = true;
             }
             else
             {
-                inputSide = inputSide - controlCount;
-                inputStates[inputSide - 1] = input; // Input numbers are 1 indexed.
-                areInputsUpdated[inputSide - 1] = true;
+                inputSide = inputSide - ControlCount;
+                InputStates[inputSide - 1] = input; // Input numbers are 1 indexed.
+                AreInputsUpdated[inputSide - 1] = true;
             }
 
-            if (areInputsUpdated.ToList().TrueForAll(x => x) && areControlsUpdated.ToList().TrueForAll(x => x))
+            if (AreInputsUpdated.ToList().TrueForAll(x => x) && AreControlsUpdated.ToList().TrueForAll(x => x))
             {
                 IsFilled = true;
                 SendOutput();
@@ -122,9 +124,9 @@ namespace LogicGateDomain
         private int ControlMinTerm()
         {
             int term = 0;
-            for (int i = 0; i < controlStates.Length; i++)
+            for (int i = 0; i < ControlStates.Length; i++)
             {
-                if (controlStates[i])
+                if (ControlStates[i])
                     term += (int)Math.Pow(2, i);
             }
             return term;
@@ -132,10 +134,10 @@ namespace LogicGateDomain
 
         private void SendOutput()
         {
-            output = inputStates[ControlMinTerm()];
+            Output = InputStates[ControlMinTerm()];
             foreach (var connection in ConnectedGates)
             {
-                connection.TargetGate.Activate(connection.InputNode, output);
+                connection.TargetGate.Activate(connection.InputNode, Output);
             }
         }
     }
@@ -143,6 +145,7 @@ namespace LogicGateDomain
     // 1 input and 2 outputs. Triggered by a clock.
     public class DFlipFlop : MultipleOutputGate, IClockable
     {
+        public new string Type { get; private set; } = "DFlipFlop";
         bool D;
 
         public DFlipFlop(string name, List<string> outputNameList)
@@ -179,8 +182,9 @@ namespace LogicGateDomain
 
     public class TFlipFlop : MultipleOutputGate, IClockable
     {
-        bool T;
-        bool State = false;
+        public new string Type { get; private set; } = "TFlipFlop";
+        public bool T { get; private set; }
+        public bool State { get; private set; } = false;
 
         public TFlipFlop(string name, List<string> outputNameList) 
             : base(name, 1, 2, new List<string>(), outputNameList)
@@ -214,9 +218,10 @@ namespace LogicGateDomain
 
     public class JKFlipFlop : MultipleOutputGate, IClockable
     {
-        bool J;
-        bool K;
-        bool State = false;
+        public new string Type { get; private set; } = "JKFlipFlop";
+        public bool J { get; private set; }
+        public bool K { get; private set; }
+        public bool State { get; private set; } = false;
 
         public JKFlipFlop(string name, int inputCount, List<string> inputNameList, List<string> outputNameList) 
             : base(name, inputCount, 2, inputNameList, outputNameList)

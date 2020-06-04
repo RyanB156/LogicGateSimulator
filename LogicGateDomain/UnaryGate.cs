@@ -6,6 +6,7 @@ namespace LogicGateDomain
     // Base type for unary gates. These can have only one input.
     public abstract class UnaryGate : SingleOutputGate
     {
+        public new string Type { get; private set; } = "UnaryGate";
         public bool Input { get; protected set; } = false;
 
         public UnaryGate(string name) : base(name, 1, new List<string>()) { }
@@ -13,7 +14,7 @@ namespace LogicGateDomain
         public void Reset()
         {
             Input = false;
-            output = false;
+            Output = false;
             IsFilled = false;
         }
 
@@ -26,7 +27,7 @@ namespace LogicGateDomain
         {
             foreach (var connection in ConnectedGates)
             {
-                connection.TargetGate.Activate(connection.InputNode, output);
+                connection.TargetGate.Activate(connection.InputNode, Output);
             }
         }
 
@@ -41,16 +42,17 @@ namespace LogicGateDomain
 
     }
 
-// Declaration of the many unary gates, each with its own behavior for sending output based on its input.
+// Declaration of the many unary gates, each with its own behavior for sending Output based on its input.
 
     public class OutputGate : UnaryGate
     {
+        public new string Type { get; private set; } = "OutputGate";
         public event EventHandler Activated;
 
         public OutputGate(string name) : base(name) { }
         public override void CheckOutput()
         {
-            output = Input;
+            Output = Input;
             OnActivated();
         }
 
@@ -62,26 +64,29 @@ namespace LogicGateDomain
 
     public class NotGate : UnaryGate
     {
+        public new string Type { get; private set; } = "NotGate";
         public NotGate(string name) : base(name) { }
         public override void CheckOutput()
         {
-            output = !Input;
+            Output = !Input;
             SendOutput();
         }
     }
 
     public class IdentityGate : UnaryGate
     {
+        public new string Type { get; private set; } = "IdentityGate";
         public IdentityGate(string name) : base(name) { }
         public override void CheckOutput()
         {
-            output = Input;
+            Output = Input;
             SendOutput();
         }
     }
 
     public class TrueGate : UnaryGate
     {
+        public new string Type { get; private set; } = "TrueGate";
         public TrueGate(string name) : base(name)
         {
             Input = true;
@@ -89,13 +94,14 @@ namespace LogicGateDomain
         }
         public override void CheckOutput()
         {
-            output = true;
+            Output = true;
             SendOutput();
         }
     }
 
     public class FalseGate : UnaryGate
     {
+        public new string Type { get; private set; } = "FalseGate";
         public FalseGate(string name) : base(name)
         {
             Input = false;
@@ -104,42 +110,43 @@ namespace LogicGateDomain
         public override void CheckOutput()
         {
             
-            output = false;
+            Output = false;
             SendOutput();
         }
     }
 
     public class InputGate : UnaryGate
     {
+        public new string Type { get; private set; } = "InputGate";
         public InputGate(string name, bool input) : base(name)
         {
             this.Input = input;
-            output = input;
+            Output = input;
             IsFilled = true;
         }
 
         public void SetInput(bool input)
         {
             this.Input = input;
-            output = input;
+            Output = input;
         }        
 
         public override void CheckOutput()
         {
-            output = Input;
+            Output = Input;
             SendOutput();
         }
 
         public void Fire()
         {
-            output = Input;
+            Output = Input;
             SendOutput();
         }
 
         public void SetInputAndFire(bool input)
         {
             this.Input = input;
-            output = input;
+            Output = input;
             SendOutput();
         }
     }

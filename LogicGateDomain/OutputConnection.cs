@@ -7,6 +7,7 @@
 
     public class OutputConnection
     {
+        public string Type { get; private set; } = "OutputConnection";
         public LogicGate TargetGate { get; private set; }
         public int InputNode { get; private set; }
 

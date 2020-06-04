@@ -11,21 +11,22 @@ namespace LogicGateDomain
     // "outputFunctions" acts as the truth table for the gate. This gets the output based on the input values.
     public class CustomGate : MultipleOutputGate
     {
-        private bool[] outputs; // bool value for each output determined by the activation inputs and the truth tables.
-        private int outputCount;
-        private Dictionary<int, bool>[] outputFunctions;
-        private bool[] inputs;
-        private bool[] areInputsUpdated;
+        public new string Type { get; private set; } = "CustomGate";
+        public bool[] Outputs { get; private set; } // bool value for each output determined by the activation inputs and the truth tables.
+        public int OutputCount { get; private set; }
+        public Dictionary<int, bool>[] OutputFunctions { get; private set; }
+        public bool[] Inputs { get; private set; }
+        public bool[] AreInputsUpdated { get; private set; }
 
         public CustomGate(string name, int inputCount, int outputCount, List<string> inputNameList,
             List<string> outputNameList, Dictionary<int, bool>[] outputFunctions)
             : base(name, inputCount, outputCount, inputNameList, outputNameList)
         {
-            outputs = new bool[outputCount];
-            this.outputCount = outputCount;
-            inputs = new bool[inputCount];
-            areInputsUpdated = new bool[inputCount];
-            this.outputFunctions = outputFunctions;
+            Outputs = new bool[outputCount];
+            OutputCount = outputCount;
+            Inputs = new bool[inputCount];
+            AreInputsUpdated = new bool[inputCount];
+            OutputFunctions = outputFunctions;
         }
 
         public static int MintermDigit(bool[] arr)
@@ -42,30 +43,30 @@ namespace LogicGateDomain
         // Update outputs based on the truth tables in "outputFunctions".
         private void UpdateOutputs()
         {
-            for (int i = 0; i < outputFunctions.Length; i++)
+            for (int i = 0; i < OutputFunctions.Length; i++)
             {
-                outputs[i] = outputFunctions[i][MintermDigit(inputs)];
+                Outputs[i] = OutputFunctions[i][MintermDigit(Inputs)];
             }
         }
 
         private void SendOutput()
         {
-            for (int i = 0; i < outputCount; i++)
+            for (int i = 0; i < OutputCount; i++)
             {
                 foreach (var connection in OutputMap[i])
                 {
-                    connection.TargetGate.Activate(connection.InputNode, outputs[i]);
+                    connection.TargetGate.Activate(connection.InputNode, Outputs[i]);
                 }
             }
         }
 
         public override void Activate(int inputSide, bool input)
         {
-            inputs[inputSide - 1] = input;
-            areInputsUpdated[inputSide - 1] = true;
+            Inputs[inputSide - 1] = input;
+            AreInputsUpdated[inputSide - 1] = true;
 
             // If all of the inputs have been activated update the outputs and send output.
-            if (areInputsUpdated.ToList().TrueForAll(x => x))
+            if (AreInputsUpdated.ToList().TrueForAll(x => x))
             {
                 IsFilled = true;
                 UpdateOutputs();

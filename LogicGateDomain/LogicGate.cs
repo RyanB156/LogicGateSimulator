@@ -13,12 +13,12 @@ namespace LogicGateDomain
 
     public abstract class LogicGate
     {
+        public string Type { get; private set; } = "LogicGate";
         public bool IsFilled { get; protected set; } = false;
         public int InputCount { get; protected set; }
         public string Name { get; protected set; }
-        protected bool output;
-
-        protected Dictionary<string, int> InputNameMap;
+        public bool Output { get; protected set; }
+        public Dictionary<string, int> InputNameMap;
 
         public LogicGate(string name, int inputCount, List<string> inputNames)
         {
@@ -50,9 +50,9 @@ namespace LogicGateDomain
             if (!IsFilled)
                 throw new GateNotConnectedException($"Gate {Name} is not connected");
             else
-                return output;
+                return Output;
         }
-        protected void SetOutput(bool output) => this.output = output;
+        protected void SetOutput(bool output) => this.Output = output;
 
         public virtual void Activate(int inputSide, bool input)
         {
@@ -63,6 +63,7 @@ namespace LogicGateDomain
 
     public class SingleOutputGate : LogicGate
     {
+        public new string Type { get; private set; } = "SingleOutputGate";
         public List<OutputConnection> ConnectedGates { get; protected set; } // Single output to map other gates to.
 
         public SingleOutputGate(string name, int inputCount, List<string> nameList) : base(name, inputCount, nameList) // TODO: Change this to an actual list.
@@ -78,8 +79,9 @@ namespace LogicGateDomain
 
     public class MultipleOutputGate : LogicGate
     {
+        public new string Type { get; private set; } = "MultipleOutputGate";
         public List<OutputConnection>[] OutputMap { get; protected set; } // Multiple outputs to map other gates to.
-        protected Dictionary<string, int> OutputNameMap;
+        public Dictionary<string, int> OutputNameMap { get; protected set; }
 
         public MultipleOutputGate(string name, int inputCount, int outputCount, List<string> inputNameList, List<string> outputNameList) 
             : base(name, inputCount, inputNameList) // TODO: Change this to an actual list.
