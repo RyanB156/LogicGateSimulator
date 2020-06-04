@@ -4,6 +4,7 @@ You can toggle inputs on or off to see the output of your circuit.
 It supports basic logic gates such as AND, OR, and NOT, as well as Decoders, Multiplexers, Flip-Flops. 
 You can also create your own logic gate with any number of inputs and outputs.
 
+See https://github.com/RyanB156/LogicGateSimulator/blob/master/LogicGateSim/Documentation.txt for documentation.
 
 F# code in FCircuitParser is used to parse the program with the FParsec Library and creates logic gate objects as defined in 
 LogicGateDomain and links them together.  
@@ -12,9 +13,10 @@ click to toggle the inputs for the circuit and see the output.
 
 ----Syntax----
 
-<GateType>[input count][(In1Name, In2Name, ..., InNName [: Out1Name, ..., OutNName])]  
-<source gate name>[.<output number> (0 indexed)] :- <target gate name>[, <target gate input choice> (1 indexed)]  
-create <gateName>(In1Name, ..., InNName : Out1Name, ..., OutNName)  
+<GateType>[input count][(In1Name, In2Name, ..., InNName [: Out1Name, ..., OutNName])] - Initialize gates.
+<source gate name>[.<output number> (0 indexed)] :- <target gate name>[, <target gate input choice> (1 indexed)] - Connect gates.
+define <customGateTypeName>(In1Name, ..., InNName : Out1Name, ..., OutNName) - Define a custom gate type.
+<customGateTypeName>(<customGateInstanceName>) - Create an instance of the custom gate.
 {  
     Out1Name <- (Boolean expression using [', ., +, =>, ==, <>]) ; [// comment]  
     ..., OutNName <- ... ;  
